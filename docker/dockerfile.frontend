@@ -1,0 +1,35 @@
+FROM node:20
+
+RUN apt-get update && apt-get install -y curl bash unzip && rm -rf /var/lib/apt/lists/*
+
+# Install bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV BUN_INSTALL="/root/.bun"
+ENV PATH="${BUN_INSTALL}/bin:${PATH}"
+
+RUN corepack enable
+
+WORKDIR /app
+
+COPY package.json package-lock.json bun.lock ./
+
+COPY packages/db/package.json ./packages/db/package.json
+COPY apps/frontend/package.json ./apps/frontend/package.json
+
+# Use npm or yarn for install, e.g., npm install here (or bun install if you want)
+RUN npm install
+
+COPY packages/db ./packages/db
+COPY apps/frontend ./apps/frontend
+
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+
+WORKDIR /app/apps/frontend
+
+# Use npm or yarn build
+RUN npm run build
+
+EXPOSE 3000
+
+CMD ["npm", "start"]

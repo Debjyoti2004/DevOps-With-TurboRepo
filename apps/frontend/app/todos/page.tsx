@@ -4,7 +4,10 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle, Plus } from 'lucide-react';
 import Navbar from '../components/navbar';
 
-const API_URL = '/api';
+const API_URL =
+  typeof window === 'undefined'
+    ? 'http://backend:3001' 
+    : 'http://localhost:3001'; 
 
 interface Todo {
   id: number;

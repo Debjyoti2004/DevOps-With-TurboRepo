@@ -5,7 +5,10 @@ import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
 import Navbar from '../components/navbar';
 
-const API_URL = '/api';
+const API_URL =
+  typeof window === 'undefined'
+    ? 'http://backend:3001' 
+    : 'http://localhost:3001'; 
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({ email: '', password: '' });
