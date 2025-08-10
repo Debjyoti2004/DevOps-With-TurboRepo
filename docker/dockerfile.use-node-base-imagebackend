@@ -1,0 +1,31 @@
+FROM node:20
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y curl bash unzip && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://bun.sh/install | bash
+ENV BUN_INSTALL="/root/.bun"
+ENV PATH="${BUN_INSTALL}/bin:${PATH}"
+
+COPY package.json bun.lock ./ 
+COPY apps/backend/package.json ./apps/backend/package.json
+COPY packages/db/package.json ./packages/db/package.json
+
+RUN bun install --filter ./apps/backend...
+
+COPY apps/backend ./apps/backend
+COPY packages/db ./packages/db
+COPY packages/db/.env packages/db/.env
+
+WORKDIR /app/packages/db
+RUN bunx prisma generate
+
+WORKDIR /app/apps/backend
+RUN bun run build
+
+EXPOSE 3001
+
+CMD ["bun", "run", "start"]

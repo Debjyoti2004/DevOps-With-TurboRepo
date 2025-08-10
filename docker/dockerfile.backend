@@ -1,0 +1,24 @@
+FROM oven/bun:latest
+
+RUN apt-get update -y && apt-get install -y nodejs npm openssl libssl-dev
+
+WORKDIR /app
+
+COPY package.json bun.lock ./ 
+COPY apps/backend/package.json ./apps/backend/package.json
+COPY packages/db/package.json ./packages/db/package.json
+
+RUN bun install --filter ./apps/backend...
+
+COPY apps/backend ./apps/backend
+COPY packages/db ./packages/db
+
+WORKDIR /app/packages/db
+RUN bunx prisma generate
+
+WORKDIR /app/apps/backend
+RUN bun run build
+
+EXPOSE 3001
+
+CMD ["bun", "run", "start"]
