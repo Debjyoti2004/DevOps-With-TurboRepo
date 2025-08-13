@@ -29,6 +29,10 @@ function authenticateToken(req: any, res: any, next: any) {
     });
 }
 
+app.get("/status",(req, res) => {
+    res.json({ status: "OK" });
+});
+
 app.post("/todos", authenticateToken, async (req, res) => {
     const { title } = req.body;
     if (!title) {
