@@ -1,135 +1,111 @@
-# Turborepo starter
+# Full-Stack Application Deployment with Docker
+This guide provides instructions for setting up and running the complete application stack (Frontend, Backend, WebSocket Server, and PostgreSQL Database) using Docker and Docker Compose.
 
-This Turborepo starter is maintained by the Turborepo core team.
+## Prerequisites
+Before you begin, ensure you have the following installed on your local machine:
 
-## Using this example
+1. Docker
+2. Docker Compose
+3. Bun (for running Prisma commands locally)
 
-Run the following command:
+## Database Configuration
+The application requires a PostgreSQL database. The connection string (*DATABASE_URL*) changes depending on how you run the application.
+
+### Understanding the *DATABASE_URL*
+
+1. For Local Development (Outside Docker):
+When running your backend on your local machine and connecting to the Dockerized PostgreSQL database, you use *localhost* because the container's port *5432* is mapped to your machine's port *5432*.
 
 ```sh
-npx create-turbo@latest
+DATABASE_URL="postgres://admin:secret@localhost:5432/postgres"
+```
+2. For Containerized Development (Inside Docker):
+When all services (backend, frontend, etc.) are running in containers on the same Docker network, they can communicate using their container names as hostnames. The backend will connect to the database using the container name *postgres-db* on the internal port *5432*.
+
+```sh
+DATABASE_URL="postgres://admin:secret@postgres-db:5432/postgres"
+```
+## Initial Database Setup (Prisma)
+Before running the application for the first time, you must initialize the database schema using Prisma.
+
+*Important*: Make sure you have a *.env* file inside the *packages/db* directory containing the correct *DATABASE_URL* for local development.
+1. Navigate to the db package:
+```sh
+cd packages/db
 ```
 
-## What's inside?
+2. Run Prisma Migration:
+This command will create the necessary tables in your database based on your schema.
 
-This Turborepo includes the following packages/apps:
+```sh
+npx prisma migrate dev --name <any_migration_name>
+```
+3. Generate Prisma Client:
+This command generates the TypeScript types for your database client.
 
-### Apps and Packages
+```sh
+bunx prisma generate
+```
+## Running the Application
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+There are two methods to run the full application stack. Using Docker Compose is the recommended and simplest approach.
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+### Method 1: Using Docker Compose (Recommended)
+This method uses the docker-compose.yml file to build and run all the services with a single command.
 
-### Utilities
+```sh
+docker-compose up --build
+```
+This command will build the images for all services if they don't exist and then start all the containers.
 
-This Turborepo has some additional tools already setup for you:
+### Method 2: Manual Docker Commands (Step-by-Step)
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+If you prefer to run each service individually, follow these steps in order.
 
-### Build
-
-To build all apps and packages, run the following command:
+1. Create Docker Network:
+```sh
+docker network create my-network
+```
+2. Run PostgreSQL Database:
+```sh
+docker run -d \
+  --name postgres-db \
+  --network my-network \
+  -e POSTGRES_USER=admin \
+  -e POSTGRES_PASSWORD=secret \
+  -e POSTGRES_DB=postgres \
+  -p 5432:5432 \
+  -v postgres_data:/var/lib/postgresql/data \
+  postgres:15
 
 ```
-cd my-turborepo
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
+3. Build and Run Backend:
+Note: We pass the container-friendly *DATABASE_URL* as a build argument.
+```sh
+# Build
+docker build -f docker/dockerfile.backend -t backend .
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
+# Run
+docker run -p 3001:3001 --network my-network backend
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
 
 ```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+4. Build and Run WebSocket (WS) Server:
+```sh
+# Build
+docker build -f docker/dockerfile.ws -t ws .
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+# Run
+docker run -p 8081:8081 --network my-network ws
 ```
 
-### Develop
+5. Build and Run Frontend:
 
-To develop all apps and packages, run the following command:
+```sh
+# Build
+docker build -f docker/dockerfile.frontend --build-arg DATABASE_URL="postgres://admin:secret@postgres-db:5432/postgres" -t frontend .
 
+# Run
+docker run -p 3000:3000 --network my-network frontend
 ```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
